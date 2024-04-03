@@ -70,6 +70,11 @@
   <build_depend>message_runtime</build_depend>
   <exec_depend>message_runtime</exec_depend>
 
+
+  <build_depend>roslaunchcv_bridge</build_depend>
+  <build_export_depend>roslaunch</build_export_depend>
+  <exec_depend>roslaunch</exec_depend>
+
   <!-- The export tag contains other, unspecified, tags -->
   <export>
     <!-- Other tools can request additional information be placed here -->

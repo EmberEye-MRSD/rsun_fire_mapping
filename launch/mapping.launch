@@ -1,6 +1,6 @@
 <!-- <xml version="1.0" encoding="UTF-8" standalone="no"> -->
 <launch>
-  <node name="fire_mapping" pkg="rsun_fire_mapping" type="fire_mapping">
+  <node name="fire_mapping" pkg="rsun_fire_mapping" type="fire_mapping" output="screen">
     <param name="fx" type="double" value="406.33233091474426"/>
     <param name="fy" type="double" value="406.9536696029995"/>
     <param name="cx" type="double" value="311.51174613074784"/>
