@@ -4,6 +4,7 @@
 #include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/PoseArray.h"
 #include "std_msgs/Float32MultiArray.h"
+#include "sensor_msgs/JointState.h"
 #include <iostream>
 
 #include "cv_bridge/cv_bridge.h"
@@ -15,6 +16,13 @@
 #include "mapping/kmeans.h"
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
+
+// Included files for Time Synchronizatoin
+#include <message_filters/subscriber.h>
+#include <message_filters/sync_policies/approximate_time.h>
+#include <message_filters/sync_policies/exact_time.h>
+#include <vector>
+
 
 /*
 Node that subscribes to both the thermal cameras feeds, maps it to absolute
@@ -45,7 +53,7 @@ private:
 
     cv::Mat fireMapLeft;
     // cv::Mat depthMapLeft;
-    std::vector<float> depthMapLeft;
+    std::vector<double> depthMapLeft;
     cv::Mat color_image;
 
     float fx = 406.33233091474426;
@@ -63,11 +71,31 @@ private:
 
     std::vector<std::vector<float>> centers;
 
+    //Variables for message filters 
+    message_filters::Subscriber<sensor_msgs::Image> image_sub;
+    message_filters::Subscriber<geometry_msgs::PoseStamped> vio_sub;
+    message_filters::Subscriber<sensor_msgs::JointState> depth_sub;
+    
+    // Exact Time policy
+    // typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, geometry_msgs::PoseStamped, sensor_msgs::JointState> MySyncPolicy;
+    // double sync_time_epsilon = 0.1;
+
+    // Approx Time policy
+    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, geometry_msgs::PoseStamped, sensor_msgs::JointState> MySyncPolicy;
+    double sync_buffer_epsilon = 5.0;
+    
+    message_filters::Synchronizer<MySyncPolicy> sync;
+
+    
 public:
     // Constructor of Fire Mapping class - subscribes to left fire map, left depth map, and left odometry
-    FireMapping(ros::NodeHandle n_)
+    FireMapping(ros::NodeHandle n_): n(n_),
+                                    image_sub(n, "/fire_map_left/image", 1),
+                                    vio_sub(n, "/mso_estimator/pose_transformed", 1),
+                                    depth_sub(n, "/thermal_depth/stamped_array", 1),
+                                    sync(MySyncPolicy(sync_buffer_epsilon), image_sub, vio_sub, depth_sub)
     {
-        n = n_;
+        // n = n_;
         n.getParam("/fire_mapping/fx", fx);
         n.getParam("/fire_mapping/fy", fy);
         n.getParam("/fire_mapping/cx", cx);
@@ -78,19 +106,34 @@ public:
             0.0, 0.0, 1.0;
 
         fireMapLeft_sub = n.subscribe("fire_map_left/image", 10, &FireMapping::fireMapLeftCallback, this);
-        depthLeft_sub = n.subscribe("/thermal_depth/image_raw", 10, &FireMapping::depthMapLeftCallback, this);
+        depthLeft_sub = n.subscribe("/thermal_depth/stamped_array", 10, &FireMapping::depthMapLeftCallback, this);
         odomLeft_sub = n.subscribe("/mso_estimator/pose_transformed", 10, &FireMapping::poseLeftCallback, this);
 
         hotspots_pub = n.advertise<geometry_msgs::PoseArray>("/hotspots", 1);
+
+        sync.registerCallback(boost::bind(&FireMapping::timeSyncCallback, this, _1, _2, _3));
     }
     
+
+    void timeSyncCallback(const sensor_msgs::Image::ConstPtr& image_msg,
+                                   const geometry_msgs::PoseStamped::ConstPtr& pose_msg,
+                                   const sensor_msgs::JointState::ConstPtr& joint_state_msg)
+    {
+        ROS_INFO("[DEBUG] Timesync(): Synced data received");
+        std::cout<<"SegIm Timestamp :"<<image_msg->header.stamp<<std::endl;
+        std::cout<<"MSO   Timestamp :"<<pose_msg->header.stamp<<std::endl;
+        std::cout<<"Depth Timestamp :"<<joint_state_msg->header.stamp<<std::endl;
+    }
+
+
+
     void fireMapLeftCallback(const sensor_msgs::Image::ConstPtr& msg)
     {
         const uint8_t* img_data = reinterpret_cast<const uint8_t*>(&msg->data[0]);
         cv::Mat cv_image(msg->height, msg->width, CV_8UC1, const_cast<uint8_t*>(img_data));
 
         fireMapLeft = cv_image.clone();
-        std::cout << "size : " << fireMapLeft.rows << " " << fireMapLeft.cols << std::endl;
+        // std::cout << "size : " << fireMapLeft.rows << " " << fireMapLeft.cols << std::endl;
         
         // Initialise all_points with all indices
         // this is done only once
@@ -112,14 +155,15 @@ public:
         }
 
     }
-    void depthMapLeftCallback(const std_msgs::Float32MultiArray::ConstPtr& msg)
+    void depthMapLeftCallback(const sensor_msgs::JointState::ConstPtr& msg)
     {
         // const uint8_t* img_data = reinterpret_cast<const uint8_t*>(&msg->data[0]);
         // cv::Mat cv_image(msg->height, msg->width, CV_8UC1, const_cast<uint8_t*>(img_data));
-        depthMapLeft = msg->data;
-        // std::cout << "msg.data : " << msg.data << std::endl;
-
-
+        
+        // Note: Currently in msg, position arg contains the depth data. In future, use custom ros msg. also, data is timestamped
+        depthMapLeft = msg->position;
+        
+        // std::cout << "msg.data : " << msg->position << std::endl;
         // depthMapLeft = cv_image.clone();
     }
     void poseLeftCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
@@ -132,7 +176,7 @@ public:
         qy = msg->pose.orientation.y;
         qz = msg->pose.orientation.z;
         qw = msg->pose.orientation.w;
-        std::cout << "MSO pose : " << tx << " " << ty << " " << tz << std::endl;
+        // std::cout << "MSO pose : " << tx << " " << ty << " " << tz << std::endl;
     }
     // only run when all_points.size() > K
     std::vector<std::vector<float>> cluster_hotspots(int K = 5, int iters = 100)
@@ -215,27 +259,27 @@ public:
         std::vector<std::vector<float>> centers = cluster_hotspots(num_hotspots, iter_converge);
         if(centers.size() > 0)
         {
-            std::cout << "\n\n\n";
-            std::cout << "--- Hotspot Pixel Locations ---" << std::endl;
-            std::cout << "# clusters : " << centers.size() << std::endl;
-            std::cout << "Center 1 : " << centers[0][0] << " " << centers[0][1] << std::endl;
-            std::cout << "Center 2 : " << centers[1][0] << " " << centers[1][1] << std::endl;
+            //std::cout << "\n\n\n";
+            //std::cout << "--- Hotspot Pixel Locations ---" << std::endl;
+            //std::cout << "# clusters : " << centers.size() << std::endl;
+            //std::cout << "Center 1 : " << centers[0][0] << " " << centers[0][1] << std::endl;
+            //std::cout << "Center 2 : " << centers[1][0] << " " << centers[1][1] << std::endl;
         }
 
         // get hotspot location in camera frame
         std::vector<std::vector<float>> projections = get_projections(centers);
         if(projections.size() > 0)
         {
-            std::cout << "--- Hotspot Projections ---" << std::endl;
-            std::cout << "# clusters : " << projections.size() << std::endl;
-            std::cout << "Hotspot 1 : " << projections[0][0] << " " << projections[0][1] << projections[0][2] << std::endl;
-            std::cout << "Hotspot 2 : " << projections[1][0] << " " << projections[1][1] << projections[1][2] << std::endl;
+            //std::cout << "--- Hotspot Projections ---" << std::endl;
+            //std::cout << "# clusters : " << projections.size() << std::endl;
+            //std::cout << "Hotspot 1 : " << projections[0][0] << " " << projections[0][1] << projections[0][2] << std::endl;
+            //std::cout << "Hotspot 2 : " << projections[1][0] << " " << projections[1][1] << projections[1][2] << std::endl;
         }
 
         // get world-to-drone transform
         Eigen::Matrix4f H_world_drone = get_drone_H();
-        std::cout << "--- Drone H wrt World ---" << std::endl;
-        std::cout << H_world_drone << std::endl;
+        //std::cout << "--- Drone H wrt World ---" << std::endl;
+        //std::cout << H_world_drone << std::endl;
 
         // for each projected point, get drone to hotspot transform
         geometry_msgs::PoseArray pose_array;
@@ -260,7 +304,7 @@ public:
             pose.orientation.z = 0.0;
             pose.orientation.w = 1.0;
 
-            std::cout << "idx : " << i << " | pose : " << pose.position.x << " " << pose.position.y << " " << pose.position.z << std::endl;
+            //std::cout << "idx : " << i << " | pose : " << pose.position.x << " " << pose.position.y << " " << pose.position.z << std::endl;
 
             pose_array.poses.push_back(pose);
         }
@@ -278,9 +322,10 @@ int main(int argc, char **argv)
 
     while (ros::ok())
     {
-        fm.run();
+        // fm.run();
         ros::spinOnce();
     }
+
 
     cv::destroyAllWindows();
 
