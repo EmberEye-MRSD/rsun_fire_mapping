@@ -1,0 +1,43 @@
+# hotspots:
+#     fire1:
+#         position: [47.4, 0, 0]
+#         orientation: [0, 0, 0, 1]
+#     fire2:
+#         position: [47.4, -26.2, 0]
+#         orientation: [0, 0, 0, 1]
+#     fire3:
+#         position: [24.4, -54.2, 0]
+#         orientation: [0, 0, 0, 1]
+#     fire4:
+#         position: [11.4, -41.2, 0]
+#         orientation: [0, 0, 0, 1]
+
+# Jaskaran (04.15.2024)
+# hotspots:
+#     fire1:
+#         position: [50.0, 0, 0]
+#         orientation: [0, 0, 0, 1]
+#     fire2:
+#         position: [52.5, -28.05, 0]
+#         orientation: [0, 0, 0, 1]
+#     fire3:
+#         position: [26.15, -59.2, 0]
+#         orientation: [0, 0, 0, 1]
+#     fire4:
+#         position: [11.4, -41.2, 0]
+#         orientation: [0, 0, 0, 1]
+
+# SVD (04.15.2024)
+hotspots:
+    fire1:
+        position: [30.083, -15.75, 0]
+        orientation: [0, 0, 0, 1]
+    fire2:
+        position: [38.5, -37.33, 0]
+        orientation: [0, 0, 0, 1]
+    fire3:
+        position: [16.917, -37.33, 0]
+        orientation: [0, 0, 0, 1]
+    fire4:
+        position: [2.167, -18.75, 0]
+        orientation: [0, 0, 0, 1]
