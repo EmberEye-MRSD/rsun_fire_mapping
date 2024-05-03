@@ -132,8 +132,8 @@ include
 )
 
 find_package(Eigen3)
-add_executable(fire_mapping src/fire_mapping.cpp)
-target_link_libraries(fire_mapping ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} Eigen3::Eigen)
+# add_executable(fire_mapping_stereo src/fire_mapping_stereo.cpp)
+# target_link_libraries(fire_mapping_stereo ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} Eigen3::Eigen)
 
 # add_dependencies(thermal_intensity beginner_tutorials_generate_messages_cpp)
 ## Declare a C++ library
