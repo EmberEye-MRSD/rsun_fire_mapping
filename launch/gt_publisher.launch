@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+   <node pkg="rsun_fire_mapping" type="fire_gt_visualizer.py" name="fire_gt_viz" output="screen" respawn="false" respawn_delay="0">
+      <param name="marker_size" value="1.0"/>
+      <param name="gt_path" value="$(find rsun_fire_mapping)/params/hotspot_ground_truth.yaml"/>
+   </node>
+
+</launch>

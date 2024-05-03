@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<launch>
+   
+   <!-- <include file="$(find rsun_fire_mapping)/launch/gt_publisher.launch" /> -->
+   <node pkg="rsun_fire_mapping" type="fire_gt_visualizer.py" name="fire_gt_viz" output="screen" respawn="false">
+      <param name="marker_size" value="1.0"/>
+      <param name="gt_path" value="$(find rsun_fire_mapping)/params/hotspot_ground_truth.yaml"/>
+   </node>
+
+   <node pkg="rsun_fire_mapping" type="temporal_mapping.py" name="temporal_mapping" output="screen" respawn="false">
+      <param name="nn_threshold" value="2.5"/>
+      <param name="outlier_frame_threshold" value="5"/>
+      <param name="clipping_distance" value="6.0"/>
+      <param name="hotspot_inflation_radius" value="1.0"/>
+      <param name="distance_weighing" value="False"/>
+   </node>
+ 
+   <node pkg="rsun_fire_mapping" type="fire_localization.py" name="fire_localization" output="screen" respawn="false">
+      <param name="left_info_path" value="$(find rsun_fire_mapping)/params/thermal_left.yaml"/>
+      <param name="right_info_path" value="$(find rsun_fire_mapping)/params/thermal_right.yaml"/>
+
+      
+   </node>
+
+</launch>
